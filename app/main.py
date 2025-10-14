@@ -24,4 +24,4 @@ async def generate_app(data:User_json,background_tasks:BackgroundTasks):
     save_job(job_id, "processing")
     job_status = load_job(job_id)
     background_tasks.add_task(build_and_deploy, data, job_id)
-    return {"job_id": job_id, "status": "accepted"}
+    return {"job_id": job_id, "status": job_status}

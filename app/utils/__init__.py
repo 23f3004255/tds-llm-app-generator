@@ -1,1 +1,2 @@
 from .check_secret import check_secret
+from .utilities import clear_generated_app_folder_except_git
