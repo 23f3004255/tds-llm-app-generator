@@ -22,8 +22,8 @@ user = g.get_user()
 
 
 def create_repo(repo_name: str):
-    log.info("🔹 Creating repository:", repo_name)
-    log.info("TOKEN:", GITHUB_TOKEN[:8], "...", "OWNER:", OWNER)
+    log.info(f"Creating repository: {repo_name}")
+    # log.info("TOKEN:", GITHUB_TOKEN[:8], "...", "OWNER:", OWNER)
 
     try:
         repo = user.create_repo(

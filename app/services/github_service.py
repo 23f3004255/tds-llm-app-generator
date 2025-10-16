@@ -19,8 +19,7 @@ def create_repo(repo_name):
         # Repo exists
         return False
     else:
-        raise Exception(resp.json())
-    log.info("repo creation ended")    
+        raise Exception(resp.json())    
 
 def commit_file(repo_name, file_path, content_bytes, commit_msg):
     log.info("commit started")
@@ -39,7 +38,7 @@ def commit_file(repo_name, file_path, content_bytes, commit_msg):
         return resp.json()["commit"]["sha"]
     else:
         raise Exception(resp.json())
-    log.info("commit ended")
+    
 
 def enable_pages(repo_name, branch="main"):
     log.info("enable pages started")
