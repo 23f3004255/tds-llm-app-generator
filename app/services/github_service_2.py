@@ -38,58 +38,70 @@ def create_repo(repo_name: str):
             raise e
 
 
+# def commit_file(repo, file_path: str, content_bytes: bytes, commit_msg: str):
+#     print(f"📦 Committing file: {file_path}")
+#     try:
+#         # Check if file exists
+#         contents = repo.get_contents(file_path)
+#         repo.update_file(contents.path, commit_msg, content_bytes.decode("utf-8"), contents.sha)
+#         print(f"✅ Updated: {file_path}")
+#     except GithubException as e:
+#         if e.status == 404:
+#             repo.create_file(file_path, commit_msg, content_bytes.decode("utf-8"))
+#             print(f"✅ Created: {file_path}")
+#         else:
+#             raise e
+
 def commit_file(repo, file_path: str, content_bytes: bytes, commit_msg: str):
     print(f"📦 Committing file: {file_path}")
     try:
         # Check if file exists
         contents = repo.get_contents(file_path)
-        repo.update_file(contents.path, commit_msg, content_bytes.decode("utf-8"), contents.sha)
-        print(f"✅ Updated: {file_path}")
+        result = repo.update_file(contents.path, commit_msg, content_bytes.decode("utf-8"), contents.sha)
+        sha = result["commit"].sha  # Get the commit SHA
+        print(f"✅ Updated: {file_path} (SHA: {sha})")
+        return sha
     except GithubException as e:
         if e.status == 404:
-            repo.create_file(file_path, commit_msg, content_bytes.decode("utf-8"))
-            print(f"✅ Created: {file_path}")
+            result = repo.create_file(file_path, commit_msg, content_bytes.decode("utf-8"))
+            sha = result["commit"].sha  # Get the commit SHA
+            print(f"✅ Created: {file_path} (SHA: {sha})")
+            return sha
         else:
             raise e
+        
 
+def commit_all_files_single_sha(repo, files: list, commit_msg: str):
+    """
+    Commit multiple files in a single commit and return the commit SHA.
+    """
+    # 1️⃣ Get main branch reference
+    ref = repo.get_git_ref("heads/main")
+    base_commit = repo.get_git_commit(ref.object.sha)
 
-# def enable_pages(repo, branch="main"):
-#     print("🌐 Enabling GitHub Pages...")
-#     try:
-#         repo.enable_pages(source="main")
-#         print("✅ Pages enabled:", repo.html_url.replace("github.com", "github.io"))
-#         return repo.html_url.replace("github.com", "github.io")
-#     except Exception as e:
-#         raise Exception(f"Failed to enable GitHub Pages: {e}")
-    
-# def enable_github_pages(repo_name, token, owner):
-#     """
-#     Safely enables GitHub Pages for an existing repo after ensuring main branch exists.
-#     """
-#     url = f"https://api.github.com/repos/{owner}/{repo_name}/pages"
-#     headers = {
-#         "Authorization": f"token {token}",
-#         "Accept": "application/vnd.github+json",
-#     }
+    # 2️⃣ Create blobs for all files
+    element_list = []
+    for f in files:
+        blob = repo.create_git_blob(f["content"], "utf-8")
+        element_list.append({
+            "path": f["path"],
+            "mode": "100644",
+            "type": "blob",
+            "sha": blob.sha
+        })
 
-#     data = {
-#         "source": {
-#             "branch": "main",
-#             "path": "/"
-#         }
-#     }
+    # 3️⃣ Create tree
+    tree = repo.create_git_tree(element_list, base_commit.tree)
 
-#     # Wait a bit to ensure repo + commits exist
-#     time.sleep(3)
+    # 4️⃣ Create commit
+    commit = repo.create_git_commit(commit_msg, tree, [base_commit])
 
-#     response = requests.put(url, json=data, headers=headers)
+    # 5️⃣ Update branch reference
+    ref.edit(commit.sha)
 
-#     if response.status_code in [201, 204]:
-#         print(f"✅ GitHub Pages enabled: https://{owner}.github.io/{repo_name}/")
-#         return f"https://{owner}.github.io/{repo_name}/"
-#     else:
-#         print(f"❌ Failed to enable GitHub Pages: {response.status_code} {response.text}")
-#         return None
+    print(f"✅ Committed all files in one commit: SHA {commit.sha}")
+    return commit.sha
+
 
 
 
@@ -156,24 +168,56 @@ def enable_github_pages(repo_name, token, owner):
 
 
 
+# def handle_round(task_id: str, round_number: int, generated_files: List[Dict[str, str]]):
+#     repo_name = f"task-{task_id}"
+
+#     # Round 1: Create repo (without enabling Pages yet)
+#     if round_number == 1:
+#         repo = create_repo(repo_name)
+#     else:
+#         repo = g.get_repo(f"{OWNER}/{repo_name}")
+
+#     # Step 1: Commit all files
+#     sha_dict = {}
+#     # for f in generated_files:
+#     #     path = f["path"]
+#     #     content = f["content"].encode("utf-8")
+#     #     commit_file(repo, path, content, f"Round {round_number} commit")
+#     #     sha_dict[path] = "committed"
+
+#     for f in generated_files:
+#         path = f["path"]
+#         content = f["content"].encode("utf-8")
+#         commit_sha = commit_file(repo, path, content, f"Round {round_number} commit")
+#         sha_dict[path] = commit_sha
+
+#     # Step 2: Enable Pages only after committing files (branch exists now)
+#     pages_url = None
+#     if round_number == 1:
+#         pages_url = enable_github_pages(repo_name=repo_name, token=GITHUB_TOKEN, owner=OWNER)
+
+#     return {"repo": repo_name, "commit_shas": sha_dict, "pages_url": pages_url}
+
 def handle_round(task_id: str, round_number: int, generated_files: List[Dict[str, str]]):
     repo_name = f"task-{task_id}"
 
-    # Round 1: Create repo (without enabling Pages yet)
+    # Round 1: create repo (auto-init)
     if round_number == 1:
         repo = create_repo(repo_name)
     else:
         repo = g.get_repo(f"{OWNER}/{repo_name}")
 
-    # Step 1: Commit all files
-    sha_dict = {}
-    for f in generated_files:
-        path = f["path"]
-        content = f["content"].encode("utf-8")
-        commit_file(repo, path, content, f"Round {round_number} commit")
-        sha_dict[path] = "committed"
+    # Commit all files in one commit per round
+    commit_sha = commit_all_files_single_sha(
+        repo,
+        files=[{"path": f["path"], "content": f["content"]} for f in generated_files],
+        commit_msg=f"Round {round_number} commit"
+    )
 
-    # Step 2: Enable Pages only after committing files (branch exists now)
+    # Map all files to same SHA
+    sha_dict = {f["path"]: commit_sha for f in generated_files}
+
+    # Enable Pages only in round 1 (after all files committed)
     pages_url = None
     if round_number == 1:
         pages_url = enable_github_pages(repo_name=repo_name, token=GITHUB_TOKEN, owner=OWNER)
@@ -181,9 +225,70 @@ def handle_round(task_id: str, round_number: int, generated_files: List[Dict[str
     return {"repo": repo_name, "commit_shas": sha_dict, "pages_url": pages_url}
 
 
+from github import InputGitTreeElement
+
+def commit_all_files_single_sha(repo, files: list, commit_msg: str):
+    """
+    Commit multiple files in a single commit and return the commit SHA.
+    """
+    # 1️⃣ Get main branch reference
+    ref = repo.get_git_ref("heads/main")
+    base_commit = repo.get_git_commit(ref.object.sha)
+
+    # 2️⃣ Create blobs and InputGitTreeElement for each file
+    element_list = []
+    for f in files:
+        blob = repo.create_git_blob(f["content"], "utf-8")
+        element_list.append(InputGitTreeElement(f["path"], "100644", "blob", sha=blob.sha))
+
+    # 3️⃣ Create tree
+    tree = repo.create_git_tree(element_list, base_commit.tree)
+
+    # 4️⃣ Create commit
+    commit = repo.create_git_commit(commit_msg, tree, [base_commit])
+
+    # 5️⃣ Update branch reference
+    ref.edit(commit.sha)
+
+    print(f"✅ Committed all files in one commit: SHA {commit.sha}")
+    return commit.sha
+
+
+# def push_to_github(task_id: str, round_number: int, base_dir: str = "generated_app") -> Dict[str, Any]:
+#     generated_files = []
+#     for root, dirs, files in os.walk(base_dir):
+#         for f in files:
+#             file_path = os.path.join(root, f)
+#             rel_path = os.path.relpath(file_path, base_dir)
+#             with open(file_path, "rb") as file_obj:
+#                 try:
+#                     content = file_obj.read().decode("utf-8")
+#                 except UnicodeDecodeError:
+#                     content = base64.b64encode(file_obj.read()).decode("utf-8")
+#             generated_files.append({"path": rel_path, "content": content})
+
+#     try:
+#         task_id = task_id.replace(" ", "_").strip()
+#         response = handle_round(task_id, round_number, generated_files)
+#     except Exception as e:
+#         print(f"❌ Error in handle_round: {e}")
+#         response = {}
+
+#     return response
 
 def push_to_github(task_id: str, round_number: int, base_dir: str = "generated_app") -> Dict[str, Any]:
+    """
+    Push all files from the generated app folder to GitHub in a single commit per round.
+    Returns:
+        {
+            "repo_name": str,
+            "commit_sha": str,
+            "pages_url": Optional[str]
+        }
+    """
     generated_files = []
+
+    # Step 1️⃣: Read all files from the generated directory
     for root, dirs, files in os.walk(base_dir):
         for f in files:
             file_path = os.path.join(root, f)
@@ -195,10 +300,29 @@ def push_to_github(task_id: str, round_number: int, base_dir: str = "generated_a
                     content = base64.b64encode(file_obj.read()).decode("utf-8")
             generated_files.append({"path": rel_path, "content": content})
 
+    # Step 2️⃣: Clean task_id
+    task_id = task_id.replace(" ", "_").strip()
+
+    # Step 3️⃣: Handle the round
     try:
-        response = handle_round(task_id, round_number, generated_files)
+        result = handle_round(task_id, round_number, generated_files)
+
+        # Extract a single commit SHA (all files committed in one commit)
+        commit_sha = None
+        if result.get("commit_shas"):
+            commit_sha = list(result["commit_shas"].values())[0]
+
+        return {
+            "repo_name": result.get("repo"),
+            "commit_sha": commit_sha,
+            "pages_url": result.get("pages_url")
+        }
+
     except Exception as e:
         print(f"❌ Error in handle_round: {e}")
-        response = {}
+        return {
+            "repo_name": None,
+            "commit_sha": None,
+            "pages_url": None
+        }
 
-    return response

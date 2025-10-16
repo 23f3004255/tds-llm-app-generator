@@ -2,7 +2,9 @@ from app.model import User_json
 import json
 from app.services import save_llm_output_v2, ask_aipipe, build_prompt
 from app.services.github_service_2 import push_to_github
+from app.services.evaluation_service import post_evaluation
 from app.utils import clear_generated_app_folder_by_round, load_context, save_context
+
 from dotenv import load_dotenv
 import os
 
@@ -54,17 +56,42 @@ def generate_app(data: User_json):
         print(f"⚠️ Failed to save context: {e}")
 
 
-# def push_code_to_github():
-#     repo_dir = os.path.join(os.getcwd(), "generated_app")
-#     remote_url = f"https://{os.getenv('GITHUB_USERNAME')}:{os.getenv('GITHUB_TOKEN')}@github.com/{os.getenv('GITHUB_USERNAME')}/tds-llm-project.git"
-#     git_push_repo()
-
-
-
 
 def build_and_deploy(data:User_json,task_id: str):
     print(f"Starting task {task_id}...")
+    # Generating App form llm
     generate_app(data)
-    links=push_to_github(task_id=data.task, round_number=data.round, base_dir="generated_app")
-    print(links)
+    # Pushing the generated app to github
+    response_dict=push_to_github(task_id=data.task, round_number=data.round, base_dir="generated_app")
+    
+    # Making post request to Evaluation URL
+    evaluation_url = data.evaluation_url
+    email = data.email
+    task = data.task
+    round_number = data.round
+    nonce = data.nonce
+    github_username = os.getenv("GITHUB_USERNAME")
+    repo_name = response_dict.get("repo_name","")
+    repo_url = f"https://github.com/{github_username}/{repo_name}"
+    commit_sha = response_dict.get("commit_sha","")
+    pages_url = response_dict.get("pages_url","")
+
+    payload = {
+        "email": email,
+        "task": task,
+        "round": round_number,
+        "nonce": nonce,
+        "repo_url": repo_url,
+        "commit_sha": commit_sha,
+        "pages_url": pages_url,
+    }
+
+    import json
+
+    try:
+        print(json.dumps(payload, default=str, indent=2))
+    except Exception as e:
+        print("Could not print payload:", e)
+        
+    post_evaluation(evaluation_url, payload)
     print(f"Task {task_id} completed.")
