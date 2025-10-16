@@ -1,11 +1,14 @@
 import os, base64, requests
 from typing import Dict, Any, List
+from app.logger import get_logger
+
+log = get_logger(__name__)
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 OWNER = os.getenv("GITHUB_USERNAME")
 
 def create_repo(repo_name):
-    print("repo creation started")
+    log.info("repo creation started")
     url = "https://api.github.com/user/repos"
     headers = {"Authorization": f"Bearer {GITHUB_TOKEN}"}
     data = {"name": repo_name, "private": False, "auto_init": False}
@@ -17,10 +20,10 @@ def create_repo(repo_name):
         return False
     else:
         raise Exception(resp.json())
-    print("repo creation ended")    
+    log.info("repo creation ended")    
 
 def commit_file(repo_name, file_path, content_bytes, commit_msg):
-    print("commit started")
+    log.info("commit started")
     url = f"https://api.github.com/repos/{OWNER}/{repo_name}/contents/{file_path}"
     headers = {"Authorization": f"Bearer {GITHUB_TOKEN}"}
     content_b64 = base64.b64encode(content_bytes).decode()
@@ -36,10 +39,10 @@ def commit_file(repo_name, file_path, content_bytes, commit_msg):
         return resp.json()["commit"]["sha"]
     else:
         raise Exception(resp.json())
-    print("commit ended")
+    log.info("commit ended")
 
 def enable_pages(repo_name, branch="main"):
-    print("enable pages started")
+    log.info("enable pages started")
     url = f"https://api.github.com/repos/{OWNER}/{repo_name}/pages"
     headers = {
         "Authorization": f"Bearer {GITHUB_TOKEN}",
@@ -51,7 +54,7 @@ def enable_pages(repo_name, branch="main"):
         return resp.json().get("html_url")
     else:
         raise Exception(resp.text)
-    print("enable pages ended")
+    log.info("enable pages ended")
 
 
 
@@ -116,7 +119,7 @@ def push_to_github(task_id: str, round_number: int, base_dir: str = "generated_a
             generated_files=generated_files
         )
     except Exception as e:
-        print(f"Error in handle_round API: {e}")
+        log.info(f"Error in handle_round API: {e}")
         response = {}
 
     return response

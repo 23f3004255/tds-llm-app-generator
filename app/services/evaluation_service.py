@@ -1,5 +1,8 @@
 import time
 import requests
+from app.logger import get_logger
+
+log = get_logger(__name__)
 
 def post_evaluation(evaluation_url: str, payload: dict, max_total_seconds: int = 600):
     """
@@ -20,24 +23,24 @@ def post_evaluation(evaluation_url: str, payload: dict, max_total_seconds: int =
                 timeout=10
             )
             if response.status_code == 200:
-                print("✅ Successfully submitted to evaluation endpoint!")
+                log.info("Successfully submitted to evaluation endpoint!")
                 return True
             else:
-                print(f"⚠️ Attempt {attempt}: HTTP {response.status_code} — {response.text[:200]}")
+                log.info(f"Attempt {attempt}: HTTP {response.status_code} — {response.text[:200]}")
         except Exception as e:
-            print(f"⚠️ Attempt {attempt}: Exception — {e}")
+            log.info(f"Attempt {attempt}: Exception — {e}")
 
         # check remaining time
         elapsed = time.time() - start_time
         remaining = max_total_seconds - elapsed
 
         if remaining <= 0:
-            print("❌ Failed to submit within 10 minutes (time limit reached)")
+            log.info("Failed to submit within 10 minutes (time limit reached)")
             return False
 
         # Adjust delay to never exceed remaining time
         next_delay = min(delay, remaining)
-        print(f"⏱ Retrying in {next_delay:.1f}s... (elapsed: {elapsed:.1f}s)")
+        log.info(f"Retrying in {next_delay:.1f}s... (elapsed: {elapsed:.1f}s)")
         time.sleep(next_delay)
 
         delay = min(delay * 2, 120)  # exponential backoff capped at 2 minutes

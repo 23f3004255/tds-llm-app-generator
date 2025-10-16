@@ -4,11 +4,13 @@ from app.services import save_llm_output_v2, ask_aipipe, build_prompt
 from app.services.github_service_2 import push_to_github
 from app.services.evaluation_service import post_evaluation
 from app.utils import clear_generated_app_folder_by_round, load_context, save_context
-
 from dotenv import load_dotenv
 import os
+from app.logger import get_logger
 
 load_dotenv()
+
+log = get_logger(__name__)
 
 def generate_app(data: User_json):
     context_file = os.path.join(os.getcwd(), "app", "data", "context.json")
@@ -35,7 +37,7 @@ def generate_app(data: User_json):
     try:
         response = ask_aipipe(prompt, os.getenv("AIPIPE_TOKEN"))
     except Exception as e:
-        print(f"❌ Some error occurred in LLM Service: {e}")
+        log.info(f"Some error occurred in LLM Service: {e}")
         return
 
     # Step 5: Clear generated folder again before saving new output
@@ -47,18 +49,18 @@ def generate_app(data: User_json):
     try:
         save_llm_output_v2(response_json=response)
     except Exception as e:
-        print(f"❌ Some error occurred in saving files: {e}")
+        log.info(f"Some error occurred in saving files: {e}")
 
     # Step 7: Save current response as context for next round
     try:
         save_context(response, round_number=data.round)
     except Exception as e:
-        print(f"⚠️ Failed to save context: {e}")
+        log.info(f"Failed to save context: {e}")
 
 
 
 def build_and_deploy(data:User_json,task_id: str):
-    print(f"Starting task {task_id}...")
+    log.info(f"Starting task {task_id}...")
     # Generating App form llm
     generate_app(data)
     # Pushing the generated app to github
@@ -85,13 +87,6 @@ def build_and_deploy(data:User_json,task_id: str):
         "commit_sha": commit_sha,
         "pages_url": pages_url,
     }
-
-    import json
-
-    try:
-        print(json.dumps(payload, default=str, indent=2))
-    except Exception as e:
-        print("Could not print payload:", e)
         
     post_evaluation(evaluation_url, payload)
-    print(f"Task {task_id} completed.")
+    log.info(f"Task {task_id} completed.")

@@ -3,6 +3,8 @@ import json
 import os
 import base64
 import re
+from app.logger import get_logger
+log = get_logger(__name__)
 
 def ask_aipipe(input_prompt:str,aipipe_token,model="gpt-4.1"):
     if not aipipe_token:
@@ -107,15 +109,15 @@ def save_llm_output(response_json, base_dir=os.path.join(os.getcwd(),"generated_
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(file["content"])
 
-    print(f"Files saved in {base_dir}")
-    print(f"Run Command: {data.get('run_command')}")
+    log.info(f"Files saved in {base_dir}")
+    log.info(f"Run Command: {data.get('run_command')}")
 
 
 
 
 def save_llm_output_v2(response_json, base_dir=os.path.join(os.getcwd(), "generated_app")):
     if not response_json:
-        print("⚠️ Empty response_json received — skipping save.")
+        log.info("⚠️ Empty response_json received — skipping save.")
         return
 
     # --- Clean LLM-style formatting (remove ```json or ``` fences) ---
@@ -125,10 +127,10 @@ def save_llm_output_v2(response_json, base_dir=os.path.join(os.getcwd(), "genera
     try:
         data = json.loads(cleaned_json)
     except json.JSONDecodeError as e:
-        print("❌ Invalid JSON received.")
-        print(f"🔍 Error details: {e}")
+        log.info("❌ Invalid JSON received.")
+        log.info(f"🔍 Error details: {e}")
         snippet = cleaned_json[:500]
-        print("\n--- JSON Snippet Preview ---\n", snippet, "\n----------------------------")
+        log.info("\n--- JSON Snippet Preview ---\n", snippet, "\n----------------------------")
         return
 
     # --- Create output base directory ---
@@ -151,10 +153,10 @@ def save_llm_output_v2(response_json, base_dir=os.path.join(os.getcwd(), "genera
                     f.write(content)
 
         except Exception as e:
-            print(f"⚠️ Some error occurred while saving {file['path']}: {e}")
+            log.info(f"⚠️ Some error occurred while saving {file['path']}: {e}")
 
-    print(f"✅ Files saved successfully in: {base_dir}")
+    log.info(f"✅ Files saved successfully in: {base_dir}")
 
     run_cmd = data.get("run_command")
     if run_cmd:
-        print(f"▶️ Run Command: {run_cmd}")
+        log.info(f"▶️ Run Command: {run_cmd}")
