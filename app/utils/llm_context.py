@@ -1,5 +1,8 @@
 import os
 import json
+from app.logger import get_logger
+
+log = get_logger(__name__)
 
 CONTEXT_PATH = os.path.join(os.getcwd(), "app", "data", "context.json")
 
@@ -32,10 +35,10 @@ def save_context(context: str, round_number: int) -> None:
         with open(CONTEXT_PATH, "w", encoding="utf-8") as f:
             json.dump(context_obj, f, ensure_ascii=False, indent=2)
 
-        print(f"✅ Context saved successfully (round {round_number}).")
+        log.info(f"Context saved successfully (round {round_number}).")
 
     except Exception as e:
-        print(f"⚠️ Error saving context: {e}")
+        log.info(f"Error saving context: {e}")
 
 
 def load_context() -> str | None:
@@ -45,7 +48,7 @@ def load_context() -> str | None:
     """
 
     if not os.path.exists(CONTEXT_PATH):
-        print("ℹ️ No previous context found. Starting fresh.")
+        log.info("No previous context found. Starting fresh.")
         return None
 
     try:
@@ -53,12 +56,12 @@ def load_context() -> str | None:
             data = f.read().strip()
 
         if not data:
-            print("ℹ️ Context file is empty.")
+            log.info("Context file is empty.")
             return None
 
-        print("✅ Loaded previous context successfully.")
+        log.info("Loaded previous context successfully.")
         return data
 
     except Exception as e:
-        print(f"⚠️ Error loading context: {e}")
+        log.info(f"Error loading context: {e}")
         return None

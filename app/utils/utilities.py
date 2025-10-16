@@ -1,5 +1,8 @@
 import os
 import shutil
+from app.logger import get_logger
+
+log = get_logger(__name__)
 
 def clear_generated_app_folder_except_git(folder_path, clear_git=False):
     """
@@ -8,7 +11,7 @@ def clear_generated_app_folder_except_git(folder_path, clear_git=False):
     If clear_git is True, deletes everything including .git.
     """
     if not os.path.exists(folder_path):
-        print(f"⚠️ Folder not found: {folder_path}")
+        log.info(f"Folder not found: {folder_path}")
         return
 
     for item in os.listdir(folder_path):
@@ -24,7 +27,7 @@ def clear_generated_app_folder_except_git(folder_path, clear_git=False):
         elif os.path.isdir(item_path):
             shutil.rmtree(item_path)
 
-    print(f"✅ Cleared all files inside '{folder_path}'{' including .git' if clear_git else ' except .git (if present)'}")
+    log.info(f"Cleared all files inside '{folder_path}'{' including .git' if clear_git else ' except .git (if present)'}")
 
 
 def clear_generated_app_folder_by_round(folder_path, round_number):
@@ -34,7 +37,7 @@ def clear_generated_app_folder_by_round(folder_path, round_number):
     For round >1: clears all files except .git (preserve git history).
     """
     if not os.path.exists(folder_path):
-        print(f"⚠️ Folder not found: {folder_path}")
+        log.info(f"Folder not found: {folder_path}")
         return
 
     clear_git = round_number == 1  # clear .git only on round 1
@@ -52,4 +55,4 @@ def clear_generated_app_folder_by_round(folder_path, round_number):
         elif os.path.isdir(item_path):
             shutil.rmtree(item_path)
 
-    print(f"✅ Cleared all files inside '{folder_path}'{' including .git' if clear_git else ' except .git (if present)'}")
+    log.info(f"Cleared all files inside '{folder_path}'{' including .git' if clear_git else ' except .git (if present)'}")

@@ -13,7 +13,7 @@ logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
     handlers=[
         RotatingFileHandler(LOG_FILE, maxBytes=5_000_000, backupCount=3),
-        logging.StreamHandler()
+        # logging.StreamHandler() # Uncomment to also log to console
     ]
 )
 
