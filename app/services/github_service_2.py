@@ -32,7 +32,7 @@ def create_repo(repo_name: str):
             auto_init=True,
             description=f"Auto-generated repo for task {repo_name}"
         )
-        log.info("Repository created:", repo.full_name)
+        log.info("Repository created: {repo.full_name}")
         return repo
     except GithubException as e:
         if e.status == 422:  # repo already exists

@@ -33,4 +33,4 @@ EXPOSE 8000
 # Example: docker run --env-file .env ...
 
 # Command to run the app
-CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

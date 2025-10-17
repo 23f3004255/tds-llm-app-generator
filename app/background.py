@@ -35,7 +35,6 @@ def generate_app(data: User_json):
 
     # Step 4: Ask the LLM (try AIPipe first, then fallback to Hugging Face)
     response = None
-    print(os.getenv("AIPIPE_TOKEN"))
     try:
         log.info("Asking AIPipe model...")
         response = ask_aipipe(input_prompt=prompt, aipipe_token=os.getenv("AIPIPE_TOKEN"))
