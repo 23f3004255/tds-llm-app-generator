@@ -5,7 +5,6 @@ from app.utils import check_secret
 from app.model import User_json
 from dotenv import load_dotenv
 from app.background import build_and_deploy
-from app.database import save_job, load_job
 from app.logger import get_logger
 
 
@@ -27,8 +26,6 @@ async def generate_app(data:User_json,background_tasks:BackgroundTasks):
         raise HTTPException(status_code=401, detail="Invalid secret")
     
     job_id = str(uuid.uuid4())
-    # save_job(job_id, "processing")
-    # job_status = load_job(job_id)
     log.info(f"Starting background task for job_id: {job_id}")
     background_tasks.add_task(build_and_deploy, data, job_id)
     return Response(status_code=200)

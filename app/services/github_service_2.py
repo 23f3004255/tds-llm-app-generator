@@ -41,21 +41,6 @@ def create_repo(repo_name: str):
         else:
             raise e
 
-
-# def commit_file(repo, file_path: str, content_bytes: bytes, commit_msg: str):
-#     log.info(f"Committing file: {file_path}")
-#     try:
-#         # Check if file exists
-#         contents = repo.get_contents(file_path)
-#         repo.update_file(contents.path, commit_msg, content_bytes.decode("utf-8"), contents.sha)
-#         log.info(f"Updated: {file_path}")
-#     except GithubException as e:
-#         if e.status == 404:
-#             repo.create_file(file_path, commit_msg, content_bytes.decode("utf-8"))
-#             log.info(f"Created: {file_path}")
-#         else:
-#             raise e
-
 def commit_file(repo, file_path: str, content_bytes: bytes, commit_msg: str):
     log.info(f"Committing file: {file_path}")
     try:
@@ -172,37 +157,6 @@ def enable_github_pages(repo_name, token, owner):
 
 
 
-# def handle_round(task_id: str, round_number: int, generated_files: List[Dict[str, str]]):
-#     repo_name = f"task-{task_id}"
-
-#     # Round 1: Create repo (without enabling Pages yet)
-#     if round_number == 1:
-#         repo = create_repo(repo_name)
-#     else:
-#         repo = g.get_repo(f"{OWNER}/{repo_name}")
-
-#     # Step 1: Commit all files
-#     sha_dict = {}
-#     # for f in generated_files:
-#     #     path = f["path"]
-#     #     content = f["content"].encode("utf-8")
-#     #     commit_file(repo, path, content, f"Round {round_number} commit")
-#     #     sha_dict[path] = "committed"
-
-#     for f in generated_files:
-#         path = f["path"]
-#         content = f["content"].encode("utf-8")
-#         commit_sha = commit_file(repo, path, content, f"Round {round_number} commit")
-#         sha_dict[path] = commit_sha
-
-#     # Step 2: Enable Pages only after committing files (branch exists now)
-#     pages_url = None
-#     if round_number == 1:
-#         pages_url = enable_github_pages(repo_name=repo_name, token=GITHUB_TOKEN, owner=OWNER)
-
-#     return {"repo": repo_name, "commit_shas": sha_dict, "pages_url": pages_url}
-
-
 def handle_round(task_id: str, round_number: int, generated_files: List[Dict[str, str]]):
     repo_name = f"task-{task_id}"
 
@@ -259,27 +213,6 @@ def commit_all_files_single_sha(repo, files: list, commit_msg: str):
     return commit.sha
 
 
-# def push_to_github(task_id: str, round_number: int, base_dir: str = "generated_app") -> Dict[str, Any]:
-#     generated_files = []
-#     for root, dirs, files in os.walk(base_dir):
-#         for f in files:
-#             file_path = os.path.join(root, f)
-#             rel_path = os.path.relpath(file_path, base_dir)
-#             with open(file_path, "rb") as file_obj:
-#                 try:
-#                     content = file_obj.read().decode("utf-8")
-#                 except UnicodeDecodeError:
-#                     content = base64.b64encode(file_obj.read()).decode("utf-8")
-#             generated_files.append({"path": rel_path, "content": content})
-
-#     try:
-#         task_id = task_id.replace(" ", "_").strip()
-#         response = handle_round(task_id, round_number, generated_files)
-#     except Exception as e:
-#         log.info(f" Error in handle_round: {e}")
-#         response = {}
-
-#     return response
 
 def push_to_github(task_id: str, round_number: int, base_dir: str = "generated_app") -> Dict[str, Any]:
     """

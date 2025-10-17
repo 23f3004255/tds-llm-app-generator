@@ -1,12 +1,13 @@
 from app.model import User_json
-import json
-from app.services import save_llm_output_v2, ask_aipipe, build_prompt
+from app.services import  ask_aipipe, ask_hugging_face, build_prompt_xml, save_llm_output_xml
 from app.services.github_service_2 import push_to_github
 from app.services.evaluation_service import post_evaluation
 from app.utils import clear_generated_app_folder_by_round, load_context, save_context
 from dotenv import load_dotenv
 import os
 from app.logger import get_logger
+
+
 
 load_dotenv()
 
@@ -24,7 +25,7 @@ def generate_app(data: User_json):
         previous_context = load_context()
 
     # Step 3: Build the prompt
-    prompt = build_prompt(
+    prompt = build_prompt_xml(
         task_description=data.brief,
         attachments=data.attachments,
         checks=data.checks,
@@ -32,13 +33,19 @@ def generate_app(data: User_json):
         previous_context=previous_context
     )
 
-    # Step 4: Call the LLM
+    # Step 4: Ask the LLM (try AIPipe first, then fallback to Hugging Face)
     response = None
+    print(os.getenv("AIPIPE_TOKEN"))
     try:
-        response = ask_aipipe(prompt, os.getenv("AIPIPE_TOKEN"))
+        log.info("Asking AIPipe model...")
+        response = ask_aipipe(input_prompt=prompt, aipipe_token=os.getenv("AIPIPE_TOKEN"))
     except Exception as e:
-        log.info(f"Some error occurred in LLM Service: {e}")
-        return
+        log.warning(f"AIPipe failed ({e}), switching to Hugging Face...")
+        log.info("Asking Hugging Face model...")
+        response = ask_hugging_face(prompt=prompt, hf_token=os.getenv("HF_API_TOKEN"))
+
+    if not response:
+        log.error("Both AIPipe and Hugging Face failed.")
 
     # Step 5: Clear generated folder again before saving new output
     clear_generated_app_folder_by_round(folder_path=os.path.join(os.getcwd(), "generated_app"),
@@ -47,7 +54,7 @@ def generate_app(data: User_json):
 
     # Step 6: Save the LLM-generated files
     try:
-        save_llm_output_v2(response_json=response)
+        save_llm_output_xml(response_xml=response)
     except Exception as e:
         log.info(f"Some error occurred in saving files: {e}")
 
@@ -88,5 +95,5 @@ def build_and_deploy(data:User_json,task_id: str):
         "pages_url": pages_url,
     }
         
-    post_evaluation(evaluation_url, payload)
+    # post_evaluation(evaluation_url, payload)
     log.info(f"Task {task_id} completed.")

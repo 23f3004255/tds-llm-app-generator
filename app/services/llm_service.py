@@ -1,34 +1,12 @@
-import requests
 import json
 import os
 import base64
 import re
+import xml.etree.ElementTree as ET
 from app.logger import get_logger
 log = get_logger(__name__)
 
-def ask_aipipe(input_prompt:str,aipipe_token,model="gpt-4.1"):
-    if not aipipe_token:
-        raise RuntimeError("AIPIPE_TOKEN not found please provide token.")
 
-    response = requests.post(
-        "https://aipipe.org/openai/v1/responses",
-        headers={
-                "Authorization": f"Bearer {aipipe_token}",
-                "Content-Type": "application/json"
-                },
-        json={
-                "model": model,
-                "input": input_prompt
-                }
-    )
-
-    # Raise an exception if request failed
-    response.raise_for_status()
-
-    # Parse JSON
-    data = response.json()
-
-    return data["output"][0]["content"][0]["text"]
 
 
 def build_prompt(task_description,attachments,checks, round_number, previous_context=None):
@@ -62,18 +40,20 @@ def build_prompt(task_description,attachments,checks, round_number, previous_con
     {previous_context or "No previous code. This is the first round."}
     
     ## Output Format
-    You must respond **strictly in JSON format**:
+    You must respond **strictly in valid JSON format**:
+    - Include commas between all fields.
     {{
       "files": [
         {{
           "path": "relative/path/to/file",
           "language": "python|javascript|html|css|...etc",
-          "content": "full file content here"
+          "content": "full file content here, inside a double-quoted string"
         }},
         ...
       ],
       "run_command": "command to run the app, if any (e.g. 'python main.py' or 'npm start')"
     }}
+    
     
     ## Rules
     1. Each file must be complete and executable.
@@ -99,25 +79,94 @@ def build_prompt(task_description,attachments,checks, round_number, previous_con
     return prompt.strip()
 
 
-def save_llm_output(response_json, base_dir=os.path.join(os.getcwd(),"generated_app")):
-    data = json.loads(response_json)
+# building XML prompt for better structure and multi-file handling
 
-    for file in data["files"]:
-        file_path = os.path.join(base_dir, file["path"])
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+def build_prompt_xml(task_description, attachments, checks, round_number, previous_context=None):
+    """
+    Builds a structured XML prompt for LLM-based code generation (robust version).
+    Designed to ensure valid XML output for multi-file applications.
+    """
 
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(file["content"])
+    prompt = f"""
+    <instruction>
+      <role>
+        You are an expert software engineer and full-stack developer with production experience in HTML, CSS, JS, Python, and modern frameworks.
+      </role>
 
-    log.info(f"Files saved in {base_dir}")
-    log.info(f"Run Command: {data.get('run_command')}")
+      <objective>
+        Your job is to generate or update a complete deployable application based on the user's input and round information below.
+      </objective>
+
+      <round_info>
+        <current_round>{round_number}</current_round>
+        <rules>
+          <rule>If round = 1, build the entire project from scratch.</rule>
+          <rule>If round &gt; 1, update or modify the existing project according to the new instructions while keeping previous functionalities intact.</rule>
+          <rule>Ensure that the project runs correctly on GitHub Pages or via the provided run command.</rule>
+        </rules>
+      </round_info>
+
+      <task_description><![CDATA[
+      {task_description}
+      ]]></task_description>
+
+      <attachments><![CDATA[
+      {attachments}
+      ]]></attachments>
+
+      <evaluation_criteria><![CDATA[
+      {checks}
+      ]]></evaluation_criteria>
+
+      <context><![CDATA[
+      {previous_context or "No previous code. This is the first round."}
+      ]]></context>
+
+      <output_format>
+        Respond strictly in the following XML structure:
+        <response>
+          <file>
+            <path>relative/path/to/file</path>
+            <language>html|css|javascript|python|etc</language>
+            <content><![CDATA[
+                full file content here (complete code, no truncation)
+            ]]></content>
+          </file>
+          ...
+          <run_command>command to run app, if any (e.g. python app.py, npm start, etc.)</run_command>
+        </response>
+      </output_format>
+
+      <rules>
+        <rule>Each file must be complete and ready to run.</rule>
+        <rule>Do not omit imports or boilerplate.</rule>
+        <rule>Maintain consistent indentation and syntax.</rule>
+        <rule>Use clean, modular, and efficient code.</rule>
+        <rule>When modifying existing code, only update necessary parts.</rule>
+        <rule>Generate README.md — must look professional and concise.</rule>
+        <rule>Do not include any explanations, markdown, comments, or text outside &lt;response&gt; tags.</rule>
+        <rule>Do not use ellipses ("...") or placeholder code.</rule>
+      </rules>
+
+      <deployment_rules>
+        <rule>All generated files must be in the project root unless specified.</rule>
+        <rule>The entry point must be index.html (for GitHub Pages).</rule>
+        <rule>Use relative paths for assets (./style.css, ./script.js, etc.).</rule>
+        <rule>If backend, ensure the run command works (e.g. FastAPI, Flask).</rule>
+        <rule>Each file must be syntactically complete and production-ready.</rule>
+      </deployment_rules>
+
+      <generate>Generate your output now inside the &lt;response&gt; block only.</generate>
+    </instruction>
+    """
+
+    return prompt.strip()
 
 
 
-
-def save_llm_output_v2(response_json, base_dir=os.path.join(os.getcwd(), "generated_app")):
+def save_llm_output(response_json, base_dir=os.path.join(os.getcwd(), "generated_app")):
     if not response_json:
-        log.info("⚠️ Empty response_json received — skipping save.")
+        log.info("Empty response_json received — skipping save.")
         return
 
     # --- Clean LLM-style formatting (remove ```json or ``` fences) ---
@@ -127,10 +176,10 @@ def save_llm_output_v2(response_json, base_dir=os.path.join(os.getcwd(), "genera
     try:
         data = json.loads(cleaned_json)
     except json.JSONDecodeError as e:
-        log.info("❌ Invalid JSON received.")
-        log.info(f"🔍 Error details: {e}")
+        log.info("Invalid JSON received.")
+        log.info(f"Error details: {e}")
         snippet = cleaned_json[:500]
-        log.info("\n--- JSON Snippet Preview ---\n", snippet, "\n----------------------------")
+        log.info(f"\n--- JSON Snippet Preview ---\n{snippet}\n----")
         return
 
     # --- Create output base directory ---
@@ -153,10 +202,72 @@ def save_llm_output_v2(response_json, base_dir=os.path.join(os.getcwd(), "genera
                     f.write(content)
 
         except Exception as e:
-            log.info(f"⚠️ Some error occurred while saving {file['path']}: {e}")
+            log.info(f"Some error occurred while saving {file['path']}: {e}")
 
-    log.info(f"✅ Files saved successfully in: {base_dir}")
+    log.info(f"Files saved successfully in: {base_dir}")
 
     run_cmd = data.get("run_command")
     if run_cmd:
-        log.info(f"▶️ Run Command: {run_cmd}")
+        log.info(f"Run Command: {run_cmd}")
+
+
+
+def save_llm_output_xml(response_xml, base_dir=os.path.join(os.getcwd(), "generated_app")):
+    if not response_xml:
+        log.info("Empty response_xml received — skipping save.")
+        return
+
+    # --- Clean LLM-style formatting (remove ```xml or ``` fences) ---
+    cleaned_xml = re.sub(r"```(?:xml)?", "", response_xml).strip("` \n")
+
+    # --- If multiple <response> roots exist, wrap them in a single <root> ---
+    if cleaned_xml.count("<response") > 1:
+        cleaned_xml = f"<root>{cleaned_xml}</root>"
+
+    # --- Try parsing XML safely ---
+    try:
+        root = ET.fromstring(cleaned_xml)
+    except ET.ParseError as e:
+        log.info("Invalid XML received.")
+        log.info(f"Error details: {e}")
+        snippet = cleaned_xml[:500]
+        log.info(f"\n--- XML Snippet Preview ---\n{snippet}\n----")
+        return
+
+    # --- Create output base directory ---
+    os.makedirs(base_dir, exist_ok=True)
+
+    # --- Iterate through all <response> tags (or root if only one) ---
+    responses = root.findall("response") if root.tag == "root" else [root]
+
+    for resp in responses:
+        for file_elem in resp.findall("file"):
+            try:
+                path = file_elem.findtext("path")
+                content = file_elem.findtext("content") or ""
+                language = (file_elem.findtext("language") or "").lower()
+
+                if not path:
+                    continue
+
+                file_path = os.path.join(base_dir, path)
+                os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+                # --- Save file content ---
+                if language == "binary":
+                    with open(file_path, "wb") as f:
+                        f.write(base64.b64decode(content))
+                else:
+                    with open(file_path, "w", encoding="utf-8") as f:
+                        f.write(content.strip())
+
+                log.info(f"✅ Saved: {path}")
+
+            except Exception as e:
+                log.info(f"⚠️ Error saving {path}: {e}")
+
+        run_cmd_elem = resp.find("run_command")
+        if run_cmd_elem is not None and run_cmd_elem.text:
+            log.info(f"Run Command: {run_cmd_elem.text.strip()}")
+
+    log.info(f"🎯 Files saved successfully in: {base_dir}")
