@@ -94,6 +94,6 @@ def build_and_deploy(data:User_json,task_id: str):
         "commit_sha": commit_sha,
         "pages_url": pages_url,
     }
-        
-    # post_evaluation(evaluation_url, payload)
+      
+    post_evaluation(evaluation_url, payload)
     log.info(f"Task {task_id} completed.")
